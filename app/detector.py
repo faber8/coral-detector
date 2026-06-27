@@ -19,9 +19,11 @@ class CoralDetector:
         self.input_details: Optional[list] = None
         self.output_details: Optional[list] = None
         self.labels: list[str] = []
+        self.last_error: Optional[str] = None
 
     def load(self) -> None:
         self.labels = self._load_labels()
+        self.last_error = None
         if not self.model_path.exists():
             self.available = False
             self.fallback_mode = True
@@ -87,20 +89,19 @@ class CoralDetector:
         self.interpreter.set_tensor(self.input_details[0]['index'], input_data)
         self.interpreter.invoke()
 
-        output_map = {
-            detail.get('name', b'').decode('utf-8', 'ignore'): detail
-            for detail in self.output_details or []
-        }
+        box_index, class_index, score_index, num_index = self._resolve_output_indices(self.output_details)
+        boxes = self.interpreter.get_tensor(self.output_details[box_index]['index'])
+        classes = self.interpreter.get_tensor(self.output_details[class_index]['index'])
+        scores = self.interpreter.get_tensor(self.output_details[score_index]['index'])
+        num_detections = int(np.asarray(self.interpreter.get_tensor(self.output_details[num_index]['index'])).reshape(-1)[0])
 
-        boxes = self.interpreter.get_tensor(output_map.get('detection_boxes', self.output_details[0])['index'])
-        classes = self.interpreter.get_tensor(output_map.get('detection_classes', self.output_details[1])['index'])
-        scores = self.interpreter.get_tensor(output_map.get('detection_scores', self.output_details[2])['index'])
-        num_detections = int(self.interpreter.get_tensor(output_map.get('num_detections', self.output_details[3])['index'])[0])
+        scores_flat = np.asarray(scores).reshape(-1)
+        classes_flat = np.asarray(classes).reshape(-1)
 
         detections: list[tuple[int, float]] = []
-        for i in range(min(num_detections, len(scores[0]))):
-            score = float(scores[0][i])
-            class_id = int(classes[0][i])
+        for i in range(min(num_detections, len(scores_flat))):
+            score = float(scores_flat[i])
+            class_id = int(classes_flat[i])
             if score >= confidence and class_id == person_class:
                 detections.append((class_id, score))
                 if len(detections) >= max_results:
@@ -127,6 +128,27 @@ class CoralDetector:
             'confidence': round(max(confidence, 0.5), 2),
             'elapsed_ms': self._elapsed_ms(started),
         }
+
+    def _resolve_output_indices(self, output_details: list[dict]) -> tuple[int, int, int, int]:
+        if len(output_details) < 4:
+            return 0, 1, 2, 3
+
+        names = [detail.get('name', b'').decode('utf-8', 'ignore').lower() for detail in output_details]
+        desired_names = ['detection_boxes', 'detection_classes', 'detection_scores', 'num_detections']
+        found: list[int] = []
+
+        for desired in desired_names:
+            for index, name in enumerate(names):
+                if desired in name:
+                    found.append(index)
+                    break
+            else:
+                found.append(-1)
+
+        if all(index >= 0 for index in found):
+            return found[0], found[1], found[2], found[3]
+
+        return 0, 1, 2, 3
 
     def _elapsed_ms(self, started: float) -> int:
         return max(1, int((time.perf_counter() - started) * 1000))
