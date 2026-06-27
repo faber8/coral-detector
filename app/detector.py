@@ -50,9 +50,10 @@ class CoralDetector:
             self.output_details = self.interpreter.get_output_details()
             self.available = True
             self.fallback_mode = False
-        except Exception:
+        except Exception as exc:
             self.available = False
             self.fallback_mode = True
+            self.last_error = str(exc)
 
     def detect(self, image_bytes: bytes, confidence: float, person_class: int, max_results: int) -> dict:
         started = time.perf_counter()
