@@ -1,0 +1,16 @@
+version: '3.9'
+
+services:
+  coral-detector:
+    build: .
+    container_name: coral-detector
+    ports:
+      - "192.168.1.116:8000:8000"
+    environment:
+      - CONFIDENCE=0.65
+      - PERSON_CLASS=0
+      - MAX_RESULTS=10
+    devices:
+      - "/dev/bus/usb:/dev/bus/usb"
+    privileged: true
+    restart: unless-stopped
