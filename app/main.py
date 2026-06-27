@@ -4,12 +4,14 @@ from pathlib import Path
 from fastapi import FastAPI, File, UploadFile
 from fastapi.responses import Response
 
-from app.config import CONFIDENCE, MAX_RESULTS, MODEL_PATH, PERSON_CLASS
+from app.config import CONFIDENCE, MAX_RESULTS, MODEL_PATH, PERSON_CLASS, ensure_model_files
 from app.detector import CoralDetector
 from app.image import placeholder_jpeg_bytes
 from app.models import DetectResponse, HealthResponse
 
 app = FastAPI(title='coral-detector')
+
+ensure_model_files()
 
 try:
     detector = CoralDetector(str(MODEL_PATH), 'models/coco_labels.txt')
