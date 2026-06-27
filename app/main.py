@@ -1,3 +1,6 @@
+import os
+from pathlib import Path
+
 from fastapi import FastAPI, File, UploadFile
 from fastapi.responses import Response
 
@@ -42,8 +45,11 @@ async def detect_file(payload: dict) -> dict:
     if not path:
         return {'person': False, 'count': 0, 'confidence': 0.0, 'elapsed_ms': 0}
 
+    expanded_path = os.path.expanduser(path)
+    resolved_path = Path(expanded_path).expanduser()
+
     try:
-        with open(path, 'rb') as handle:
+        with resolved_path.open('rb') as handle:
             image_bytes = handle.read()
     except OSError:
         return {'person': False, 'count': 0, 'confidence': 0.0, 'elapsed_ms': 0}
