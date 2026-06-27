@@ -133,7 +133,13 @@ class CoralDetector:
         if len(output_details) < 4:
             return 0, 1, 2, 3
 
-        names = [detail.get('name', b'').decode('utf-8', 'ignore').lower() for detail in output_details]
+        names = []
+        for detail in output_details:
+            name = detail.get('name', b'')
+            if isinstance(name, bytes):
+                names.append(name.decode('utf-8', 'ignore').lower())
+            else:
+                names.append(str(name).lower())
         desired_names = ['detection_boxes', 'detection_classes', 'detection_scores', 'num_detections']
         found: list[int] = []
 
