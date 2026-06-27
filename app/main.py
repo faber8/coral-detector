@@ -29,6 +29,18 @@ def health() -> dict:
     }
 
 
+@app.get('/debug')
+def debug() -> dict:
+    return {
+        'model_exists': str(MODEL_PATH.exists()),
+        'model_path': str(MODEL_PATH),
+        'labels_exists': str(MODEL_PATH.exists()),
+        'available': detector.available,
+        'fallback_mode': detector.fallback_mode,
+        'last_error': getattr(detector, 'last_error', None),
+    }
+
+
 @app.post('/detect', response_model=DetectResponse)
 async def detect(file: UploadFile = File(...)) -> dict:
     image_bytes = await file.read()
