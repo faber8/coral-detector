@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 
 from fastapi import FastAPI, File, UploadFile
-from fastapi.responses import Response
+from fastapi.responses import HTMLResponse, Response
 
 from app.config import CONFIDENCE, MAX_RESULTS, MODEL_PATH, PERSON_CLASS, ensure_model_files
 from app.detector import CoralDetector
@@ -18,6 +18,70 @@ try:
     detector.load()
 except Exception:
     detector = CoralDetector(str(MODEL_PATH), 'models/coco_labels.txt')
+
+
+@app.get('/', response_class=HTMLResponse)
+def web_form() -> str:
+    return '''
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Coral Detector</title>
+        <style>
+            body {font-family: Arial, sans-serif; margin: 2rem;}
+            input[type=file] {margin-bottom: 1rem;}
+            .result {margin-top: 1rem; padding: 1rem; border: 1px solid #ddd; background: #f9f9f9;}
+        </style>
+    </head>
+    <body>
+        <h1>Coral Detector</h1>
+        <form id="uploadForm">
+            <label for="file">Sélectionnez une image :</label><br>
+            <input type="file" id="file" name="file" accept="image/*" required/><br>
+            <button type="submit">Analyser</button>
+        </form>
+        <div class="result" id="result"></div>
+
+        <script>
+            const form = document.getElementById('uploadForm');
+            const resultEl = document.getElementById('result');
+
+            form.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                resultEl.textContent = 'Analyse en cours...';
+                const fileInput = document.getElementById('file');
+                const file = fileInput.files[0];
+                if (!file) {
+                    resultEl.textContent = 'Aucun fichier sélectionné.';
+                    return;
+                }
+                const formData = new FormData();
+                formData.append('file', file);
+
+                try {
+                    const response = await fetch('/detect', {
+                        method: 'POST',
+                        body: formData,
+                    });
+                    if (!response.ok) {
+                        throw new Error('Erreur réseau ' + response.status);
+                    }
+                    const data = await response.json();
+                    resultEl.innerHTML = `<strong>Résultat :</strong><br>
+                        Personne : ${data.person}<br>
+                        Count : ${data.count}<br>
+                        Confidence : ${data.confidence}<br>
+                        Elapsed ms : ${data.elapsed_ms}`;
+                } catch (error) {
+                    resultEl.textContent = 'Erreur : ' + error.message;
+                }
+            });
+        </script>
+    </body>
+    </html>
+    '''
 
 
 @app.get('/health', response_model=HealthResponse)
